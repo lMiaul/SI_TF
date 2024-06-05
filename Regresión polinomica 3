@@ -1,0 +1,27 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from google.colab import files
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
+# Cargar el archivo Excel desde el computador al Drive
+uploaded = files.upload()
+#Nombre del archivo que se ha subido
+filename = list(uploaded.keys())[0]
+#lee el archivo Excel en un Dataframe de la librería pandas
+data = pd.read_excel(filename)
+#Permite que se eliminen los espacios en blanco
+data.columns = data.columns.str.strip()
+
+# Seleccion de columna de interes
+data = data[['DEPARTAMENTO', 'QRESIDUOS_MUN', 'PERIODO']]
+
+# Agrupar departamento y año para tener las sumas de los valores
+grouped_data = data.groupby(['DEPARTAMENTO', 'PERIODO']).sum().reset_index()
+
+# Obtener la lista de departamentos unicos
+departamentos = grouped_data['DEPARTAMENTO'].unique()
+
+# Mostrar las primeras filas de la agrupación del DataFrame
+grouped_data.head()
