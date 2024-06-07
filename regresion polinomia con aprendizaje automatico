@@ -1,0 +1,101 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import PolynomialFeatures, StandardScaler
+from sklearn.linear_model import SGDRegressor
+from sklearn.pipeline import make_pipeline
+from google.colab import files
+# Cargar el archivo Excel desde el computador al Drive
+uploaded = files.upload()
+
+# Nombre del archivo que se ha subido
+filename = list(uploaded.keys())[0]
+
+# Leer el archivo Excel en un DataFrame de la librería pandas
+data = pd.read_excel(filename)
+# Eliminar los espacios en blanco en los nombres de las columnas
+data.columns = data.columns.str.strip()
+
+# Seleccionar las columnas de interés
+data = data[['DEPARTAMENTO', 'QRESIDUOS_MUN', 'PERIODO']]
+
+# Agrupar por departamento y año para tener las sumas de los valores
+grouped_data = data.groupby(['DEPARTAMENTO', 'PERIODO']).sum().reset_index()
+
+# Obtener la lista de departamentos únicos
+departamentos = grouped_data['DEPARTAMENTO'].unique()
+# Crear un diccionario para almacenar los modelos por departamento
+models_dict = {}
+
+# Definir el grado del polinomio para la regresión
+degree = 2
+
+# Ajustar un modelo de regresión polinómica con SGDRegressor para cada departamento
+for departamento in departamentos:
+    # Filtrar los datos del departamento
+    dept_data = grouped_data[grouped_data['DEPARTAMENTO'] == departamento]
+    # Extraer la columna Periodo como característica X
+    X = dept_data[['PERIODO']]
+    # Extraer la columna QRESIDUOS_MUN como objetivo y
+    y = dept_data['QRESIDUOS_MUN']
+
+    # Crear el pipeline para la transformación polinómica, la estandarización y el modelo de regresión con SGD
+    model = make_pipeline(PolynomialFeatures(degree), StandardScaler(), SGDRegressor(max_iter=50000, tol=1e-3, random_state=42, learning_rate='optimal', eta0=0.01))
+
+    # Entrenar el modelo con los datos iniciales
+    model.fit(X, y)
+
+    # Guardar el modelo en el diccionario
+    models_dict[departamento] = model
+# Crear un diccionario vacío para almacenar las predicciones por departamento
+predictions_dict = {}
+
+# Para cada departamento, hacer predicciones para los próximos 10 años
+for departamento in departamentos:
+    # Obtener el modelo entrenado para el departamento
+    model = models_dict[departamento]
+
+    # Obtener el último año conocido para el departamento
+    ultimo_anio_conocido = max(grouped_data[grouped_data['DEPARTAMENTO'] == departamento]['PERIODO'])
+    # Generar un arreglo con los próximos 10 años
+    periodos_futuros = pd.DataFrame(np.arange(ultimo_anio_conocido + 1, ultimo_anio_conocido + 11), columns=['PERIODO'])
+
+    # Hacer predicciones para los próximos 10 años
+    predicciones_futuras = model.predict(periodos_futuros)
+    # Guardar las predicciones en el diccionario
+    predictions_dict[departamento] = predicciones_futuras
+# Crear una figura con subplots para cada departamento
+fig, axs = plt.subplots(len(departamentos), 1, figsize=(10, 5 * len(departamentos)))
+
+# Para cada subplot, mostrar los datos históricos y la predicción para los próximos años
+for idx, departamento in enumerate(departamentos):
+    # Filtrar los datos del departamento
+    dept_data = grouped_data[grouped_data['DEPARTAMENTO'] == departamento]
+    # Extraer la columna Periodo como característica X
+    X = dept_data['PERIODO']
+    # Extraer la columna QRESIDUOS_MUN como objetivo y
+    y = dept_data['QRESIDUOS_MUN']
+    # Obtener el modelo polinómico entrenado para el departamento actual
+    model = models_dict[departamento]
+    # Obtener las predicciones para el próximo año
+    predicciones_futuras = predictions_dict[departamento]
+
+    # Graficar los datos históricos como puntos azules
+    axs[idx].scatter(X, y, color='blue', label='Datos Históricos')
+    # Graficar la línea de regresión (ajuste histórico) como una línea verde
+    periodos_historicos = pd.DataFrame(np.arange(min(X), max(X) + 1), columns=['PERIODO'])
+    axs[idx].plot(periodos_historicos, model.predict(periodos_historicos), color='green', linestyle='--', label='Ajuste Histórico')
+    # Graficar las predicciones para los próximos años como una línea roja
+    periodos_futuros_plot = np.arange(max(X) + 1, max(X) + 11)
+    axs[idx].plot(periodos_futuros_plot, predicciones_futuras, color='red', label='Predicciones Futuras')
+    # Configurar el título del subplot
+    axs[idx].set_title(f'Predicción de residuos para {departamento}')
+    # Etiqueta del eje X
+    axs[idx].set_xlabel('Año')
+    # Etiqueta del eje Y
+    axs[idx].set_ylabel('QRESIDUOS_MUN')
+    axs[idx].legend()
+
+# Ajustar el espacio entre los subplots
+plt.tight_layout()
+plt.show()
