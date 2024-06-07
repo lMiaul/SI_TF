@@ -1,0 +1,49 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import PolynomialFeatures, StandardScaler
+from sklearn.linear_model import SGDRegressor
+from sklearn.pipeline import make_pipeline
+from google.colab import files
+# Cargar el archivo Excel desde el computador al Drive
+uploaded = files.upload()
+
+# Nombre del archivo que se ha subido
+filename = list(uploaded.keys())[0]
+
+# Leer el archivo Excel en un DataFrame de la librería pandas
+data = pd.read_excel(filename)
+# Eliminar los espacios en blanco en los nombres de las columnas
+data.columns = data.columns.str.strip()
+
+# Seleccionar las columnas de interés
+data = data[['DEPARTAMENTO', 'QRESIDUOS_MUN', 'PERIODO']]
+
+# Agrupar por departamento y año para tener las sumas de los valores
+grouped_data = data.groupby(['DEPARTAMENTO', 'PERIODO']).sum().reset_index()
+
+# Obtener la lista de departamentos únicos
+departamentos = grouped_data['DEPARTAMENTO'].unique()
+# Crear un diccionario para almacenar los modelos por departamento
+models_dict = {}
+
+# Definir el grado del polinomio para la regresión
+degree = 2
+
+# Ajustar un modelo de regresión polinómica con SGDRegressor para cada departamento
+for departamento in departamentos:
+    # Filtrar los datos del departamento
+    dept_data = grouped_data[grouped_data['DEPARTAMENTO'] == departamento]
+    # Extraer la columna Periodo como característica X
+    X = dept_data[['PERIODO']]
+    # Extraer la columna QRESIDUOS_MUN como objetivo y
+    y = dept_data['QRESIDUOS_MUN']
+
+    # Crear el pipeline para la transformación polinómica, la estandarización y el modelo de regresión con SGD
+    model = make_pipeline(PolynomialFeatures(degree), StandardScaler(), SGDRegressor(max_iter=50000, tol=1e-3, random_state=42, learning_rate='optimal', eta0=0.01))
+
+    # Entrenar el modelo con los datos iniciales
+    model.fit(X, y)
+
+    # Guardar el modelo en el diccionario
+    models_dict[departamento] = model
