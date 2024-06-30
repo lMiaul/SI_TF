@@ -1,0 +1,179 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from google.colab import files
+from sklearn.preprocessing import PolynomialFeatures, StandardScaler
+from sklearn.linear_model import LinearRegression, SGDRegressor
+from sklearn.pipeline import make_pipeline
+# Cargar el archivo Excel desde el computador al Drive
+uploaded = files.upload()
+
+# Nombre del archivo que se ha subido
+filename = list(uploaded.keys())[0]
+
+# Leer el archivo Excel en un DataFrame de la librería pandas
+data = pd.read_excel(filename)
+#Permite que se eliminen los espacios en blanco
+data.columns = data.columns.str.strip()
+
+# Seleccion de columna de interes
+data = data[['DEPARTAMENTO', 'QRESIDUOS_MUN', 'PERIODO']]
+
+# Agrupar departamento y año para tener las sumas de los valores
+grouped_data = data.groupby(['DEPARTAMENTO', 'PERIODO']).sum().reset_index()
+
+# Obtener la lista de departamentos unicos
+departamentos = grouped_data['DEPARTAMENTO'].unique()
+
+# Mostrar las primeras filas de la agrupación del DataFrame
+grouped_data.head()
+from matplotlib import pyplot as plt
+_df_2.plot(kind='scatter', x='PERIODO', y='QRESIDUOS_MUN', s=32, alpha=.8)
+plt.gca().spines[['top', 'right',]].set_visible(False)
+import matplotlib.pyplot as plt
+
+# Supongamos que _df_2 es tu DataFrame
+_df_2.plot(kind='scatter', x='PERIODO', y='QRESIDUOS_MUN', s=32, alpha=.8)
+
+# Desactivar notación científica en el eje y
+plt.gca().ticklabel_format(style='plain', axis='y')
+
+# Opcionalmente, también puedes ajustar el formato del eje x si es necesario
+# plt.gca().ticklabel_format(style='plain', axis='x')
+
+# Hacer invisibles las espinas superior y derecha
+plt.gca().spines[['top', 'right']].set_visible(False)
+
+# Mostrar la gráfica
+plt.show()
+
+# Crear diccionarios para almacenar los modelos por departamento
+models_poly_dict = {}
+models_sgd_dict = {}
+
+# Definir el grado del polinomio para la regresión
+degree = 2
+
+# Crear el objeto PolynomialFeatures para generar características polinómicas
+poly = PolynomialFeatures(degree=degree)
+
+# Para cada departamento, ajustar un modelo de regresión polinómica y un modelo de SGDRegressor
+for departamento in departamentos:
+    # Filtrar los datos del departamento
+    dept_data = grouped_data[grouped_data['DEPARTAMENTO'] == departamento]
+    # Extraer la columna Periodo como característica X
+    X = dept_data[['PERIODO']]
+    # Extraer la columna QRESIDUOS_MUN como objetivo y
+    y = dept_data['QRESIDUOS_MUN']
+
+    # Transformar las características en características polinómicas
+    X_poly = poly.fit_transform(X)
+
+    # Crear y entrenar el modelo de regresión polinómica
+    modelo_polinomico = LinearRegression()
+    modelo_polinomico.fit(X_poly, y)
+
+    # Guardar el modelo en el diccionario
+    models_poly_dict[departamento] = modelo_polinomico
+
+    # Crear y entrenar el modelo de regresión con SGD
+    sgd_pipeline = make_pipeline(PolynomialFeatures(degree), StandardScaler(), SGDRegressor(max_iter=50000, tol=1e-3, random_state=42, learning_rate='optimal', eta0=0.01))
+    sgd_pipeline.fit(X, y)
+
+    # Guardar el modelo en el diccionario
+    models_sgd_dict[departamento] = sgd_pipeline
+
+# Crear un diccionario vacío para almacenar las predicciones por departamento
+predictions_poly_dict = {}
+predictions_sgd_dict = {}
+
+
+# Para cada departamento, hacer predicciones para los años 2024 y 2025
+for departamento in departamentos:
+    # Obtener el modelo entrenado para el departamento
+    modelo_polinomico = models_poly_dict[departamento]
+    modelo_sgd = models_sgd_dict[departamento]
+
+    # Generar un DataFrame con los años 2024 y 2025 con la columna 'PERIODO'
+    periodos_futuros = pd.DataFrame({'PERIODO': [2024, 2025]})
+
+    # Transformar los periodos futuros en características polinómicas
+    X_poly_futuro = poly.transform(periodos_futuros)
+    # Hacer predicciones para los años 2024 y 2025
+    predicciones_futuras_poly = modelo_polinomico.predict(X_poly_futuro)
+    predicciones_futuras_sgd = modelo_sgd.predict(periodos_futuros)
+
+    # Guardar las predicciones en el diccionario
+    predictions_poly_dict[departamento] = predicciones_futuras_poly
+    predictions_sgd_dict[departamento] = predicciones_futuras_sgd
+
+# Crear un DataFrame con las predicciones para los años 2024 y 2025
+predicciones_tabla = []
+for departamento in departamentos:
+    predicciones_tabla.append([departamento, 2024, predictions_poly_dict[departamento][0], predictions_sgd_dict[departamento][0]])
+    predicciones_tabla.append([departamento, 2025, predictions_poly_dict[departamento][1], predictions_sgd_dict[departamento][1]])
+
+predicciones_df = pd.DataFrame(predicciones_tabla, columns=['DEPARTAMENTO', 'AÑO', 'PREDICCION_POLINOMICA', 'PREDICCION_SGD'])
+
+# Configurar pandas para mostrar floats sin notación científica
+pd.options.display.float_format = '{:.2f}'.format
+
+# Mostrar la tabla de predicciones
+print(predicciones_df)
+# Configurar pandas para mostrar floats sin notación científica
+pd.options.display.float_format = '{:.2f}'.format
+
+# Crear una figura con subplots para cada departamento
+fig, axs = plt.subplots(len(departamentos), 1, figsize=(10, 5 * len(departamentos)))
+
+# Lista para almacenar las predicciones en formato de tabla
+predicciones_tabla = []
+
+# Para cada subplot, mostrar los datos históricos y la predicción para los próximos años
+for idx, departamento in enumerate(departamentos):
+    # Filtrar los datos del departamento
+    dept_data = grouped_data[grouped_data['DEPARTAMENTO'] == departamento]
+    # Extraer la columna Periodo como característica X
+    X = dept_data[['PERIODO']]
+    # Extraer la columna QRESIDUOS_MUN como objetivo y
+    y = dept_data['QRESIDUOS_MUN']
+    # Obtener los modelos entrenados para el departamento actual
+    modelo_polinomico = models_poly_dict[departamento]
+    modelo_sgd = models_sgd_dict[departamento]
+    # Obtener las predicciones para los próximos años
+    predicciones_futuras_poly = predictions_poly_dict[departamento]
+    predicciones_futuras_sgd = predictions_sgd_dict[departamento]
+
+    # Añadir predicciones a la tabla
+    predicciones_tabla.append([departamento, 2024, predicciones_futuras_poly[0], predicciones_futuras_sgd[0]])
+    predicciones_tabla.append([departamento, 2025, predicciones_futuras_poly[1], predicciones_futuras_sgd[1]])
+
+    # Graficar los datos históricos como puntos azules
+    axs[idx].scatter(X, y, color='blue', label='Datos Históricos')
+    # Graficar la línea de regresión polinómica (ajuste histórico) como una línea verde
+    periodos_historicos = np.arange(min(X['PERIODO']), max(X['PERIODO']) + 1).reshape(-1, 1)
+    periodos_historicos_df = pd.DataFrame(periodos_historicos, columns=['PERIODO'])
+    X_poly_historicos = poly.transform(periodos_historicos_df)
+    axs[idx].plot(periodos_historicos, modelo_polinomico.predict(X_poly_historicos), color='green', linestyle='--', label='Ajuste Histórico (Polinomio)')
+    # Graficar la línea de regresión con SGD (ajuste histórico) como una línea morada
+    axs[idx].plot(periodos_historicos, modelo_sgd.predict(periodos_historicos_df), color='purple', linestyle='--', label='Ajuste Histórico (SGD)')
+    # Graficar las predicciones para los próximos años como una línea roja
+    periodos_futuros_plot = np.array([2024, 2025]).reshape(-1, 1)
+    periodos_futuros_plot_df = pd.DataFrame(periodos_futuros_plot, columns=['PERIODO'])
+    axs[idx].plot(periodos_futuros_plot, predicciones_futuras_poly, color='red', label='Predicciones Futuras (Polinomio)')
+    axs[idx].plot(periodos_futuros_plot, predicciones_futuras_sgd, color='orange', label='Predicciones Futuras (SGD)')
+
+    # Desactivar notación científica en el eje y
+    axs[idx].ticklabel_format(style='plain', axis='y')
+
+    # Configurar el título del subplot
+    axs[idx].set_title(f'Predicción de residuos para {departamento} (en toneladas)')
+    # Etiqueta del eje X
+    axs[idx].set_xlabel('Año')
+    # Etiqueta del eje Y
+    axs[idx].set_ylabel('Cantidad de residuos (toneladas)')
+    axs[idx].legend()
+
+# Ajustar el espacio entre los subplots
+plt.tight_layout()
+plt.show()
